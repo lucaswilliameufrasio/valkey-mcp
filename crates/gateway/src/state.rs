@@ -1,0 +1,22 @@
+use std::{collections::HashSet, net::SocketAddr, sync::Arc};
+
+use sqlx::PgPool;
+use url::Url;
+use vault_broker::VaultClient;
+use zeroize::Zeroizing;
+
+use crate::identity::OidcClient;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub bind_address: SocketAddr,
+    pub control_pool: PgPool,
+    pub oidc: Arc<OidcClient>,
+    pub oidc_client_id: Arc<str>,
+    pub oidc_access_token_audience: Arc<str>,
+    pub mcp_public_url: Arc<Url>,
+    pub mcp_oauth_state_key: Arc<Zeroizing<String>>,
+    pub bootstrap_admin_subjects: Arc<HashSet<String>>,
+    pub vault_admin: Arc<VaultClient>,
+    pub vault_runtime: Arc<VaultClient>,
+}

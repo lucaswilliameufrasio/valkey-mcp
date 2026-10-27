@@ -1,0 +1,108 @@
+services:
+  control-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: valkey_mcp
+      POSTGRES_USER: valkey_mcp
+      POSTGRES_PASSWORD: valkey_mcp_local_only
+    volumes:
+      - valkey-control-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    profiles: ["application"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      BIND_ADDRESS: 0.0.0.0:8080
+      CONTROL_DATABASE_URL: ${CONTROL_DATABASE_URL:-postgres://valkey_mcp:valkey_mcp_local_only@control-db:5432/valkey_mcp}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://127.0.0.1:9000/application/o/valkey-mcp-dev/}
+      OIDC_BACKCHANNEL_URL: ${OIDC_BACKCHANNEL_URL:-http://authentik:9000/}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-valkey-mcp}
+      OIDC_ACCESS_TOKEN_AUDIENCE: ${OIDC_ACCESS_TOKEN_AUDIENCE:-valkey-mcp}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-http://localhost:18280}
+      MCP_OAUTH_STATE_KEY: ${MCP_OAUTH_STATE_KEY:-}
+      OIDC_BOOTSTRAP_ADMIN_SUBJECTS: ${OIDC_BOOTSTRAP_ADMIN_SUBJECTS:-}
+      VAULT_ADDRESS: ${VAULT_ADDRESS:-http://127.0.0.1:8200}
+      VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-}
+      VAULT_RUNTIME_TOKEN: ${VAULT_RUNTIME_TOKEN:-}
+    depends_on:
+      control-db:
+        condition: service_healthy
+    networks:
+      default: {}
+      authentik-dev: {}
+
+  vault:
+    profiles: ["application"]
+    image: hashicorp/vault:1.20.4
+    restart: unless-stopped
+    network_mode: "service:api"
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    logging:
+      driver: none
+    command:
+      - server
+      - -dev
+      - -dev-listen-address=0.0.0.0:8200
+      - -dev-root-token-id=${VAULT_ROOT_TOKEN:?Set VAULT_ROOT_TOKEN in .env}
+    depends_on:
+      api:
+        condition: service_started
+
+  vault-bootstrap:
+    profiles: ["application"]
+    image: hashicorp/vault:1.20.4
+    restart: "no"
+    network_mode: "service:api"
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_ROOT_TOKEN: ${VAULT_ROOT_TOKEN:?Set VAULT_ROOT_TOKEN in .env}
+      VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:?Set VAULT_ADMIN_TOKEN in .env}
+      VAULT_RUNTIME_TOKEN: ${VAULT_RUNTIME_TOKEN:?Set VAULT_RUNTIME_TOKEN in .env}
+    volumes:
+      - ./deploy/vault-bootstrap.sh:/config/vault-bootstrap.sh:ro
+      - ./deploy/vault-policies:/config/policies:ro
+    entrypoint: ["/bin/sh", "/config/vault-bootstrap.sh"]
+    depends_on:
+      vault:
+        condition: service_started
+
+  admin:
+    profiles: ["application"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: admin
+    restart: unless-stopped
+    environment:
+      ORIGIN: ${MCP_PUBLIC_URL:-http://localhost:18280}
+
+  proxy:
+    profiles: ["application"]
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-18280}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - admin
+
+volumes:
+  valkey-control-data:
+
+networks:
+  authentik-dev:
+    external: true
+    name: sql-mcp-gateway-dev_dev

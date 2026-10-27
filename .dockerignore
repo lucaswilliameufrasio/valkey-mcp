@@ -1,0 +1,8 @@
+.git
+.env
+.env.*
+!.env.example
+target
+apps/admin/node_modules
+apps/admin/.svelte-kit
+apps/admin/build

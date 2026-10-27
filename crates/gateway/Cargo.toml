@@ -1,0 +1,35 @@
+[package]
+name = "valkey-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = { version = "0.8", features = ["json", "macros", "tokio"] }
+async-nats = "0.50"
+bytes = "1"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+futures-util = "0.3"
+hmac = "0.12"
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs"] }
+reqwest = { version = "0.13", default-features = false, features = ["form", "json", "rustls", "stream"] }
+redis = { version = "1.0", default-features = false, features = ["tokio-rustls-comp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.9", features = ["chrono", "macros", "migrate", "postgres", "runtime-tokio", "tls-rustls-ring-native-roots", "uuid"] }
+thiserror = "2"
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1", features = ["serde", "v4", "v7"] }
+zeroize = { version = "1", features = ["serde"] }
+vault-broker = { path = "../vault-broker" }
+
+[dev-dependencies]
+axum = { version = "0.8", features = ["json", "macros", "tokio"] }
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
